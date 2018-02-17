@@ -61,8 +61,10 @@ app.post('/link', jsonParser, function (req, res) {
           (
             (Date.parse(payable.node.dateOccurred) <= Date.parse(paymentDate)) &&
             (
-              referenceSimilarity(payable.node.referenceId, paymentReference) ||
-              (payable.node.amount >= paymentAmount)
+              (payable.node.amount == paymentAmount) ||
+              (payable.node.referenceId == paymentReference) ||
+              referenceSimilarity(payable.node.referenceId, paymentReference)
+              // (payable.node.amount >= paymentAmount)
             )
           )
         );
@@ -80,32 +82,42 @@ app.post('/link', jsonParser, function (req, res) {
 function referenceSimilarity(payableReference, paymentReference) {
   console.log("ref sim called");
   //uniform reference strings
-  let payableRef = payableReference.toLowerCase().replace(/\s/g,'');
-  let paymentRef = paymentReference.toLowerCase().replace(/\s/g,'');
+  let payableRef = payableReference.toLowerCase().replace(/[^A-Za-z0-9\s]/, '');
+  let paymentRef = paymentReference.toLowerCase().replace(/[^A-Za-z0-9\s]/, '');
 
   //look for matching pattern - digits
-  let numericPaymentRef = paymentRef.replace(/\D/g, '');
-  if (payableRef.includes(numericPaymentRef)) {
-    console.log("numericPaymentRef match " + numericPaymentRef);
-    return true;
-  }
-
-  //look for matching pattern - chars
-  let charPaymentRef = paymentRef.replace(/[0-9]/g, '');
-  if (payableRef.includes(charPaymentRef)) {
-    console.log("charPaymentRef match " + charPaymentRef);
-    return true;
-  }
-
-  //look for partial inclusion of payment ref in payable ref
-  for (let i=0; i<paymentRef.length; i++) {
-    let slicedPaymentReference = paymentRef.slice(i, paymentRef.length/3)
-    if (payableRef.includes(slicedPaymentReference)) {
-      console.log("slice match " + slicedPaymentReference);
+  //find all numeric sequences in the payment reference
+  let numericPattern = (/[0-9]{2,}/g);
+  while ((numericSeqInPaymentRef = numericPattern.exec(paymentRef)) !== null) {
+    //for each found numeric sequence, check in Payable for a match
+    if (payableRef.includes(numericSeqInPaymentRef[0])) {
+      console.log("numericPaymentRef match: " + numericSeqInPaymentRef[0]);
       return true;
     }
   }
-  console.log("no match in reference");
+
+  //look for matching pattern - chars
+  let charsPattern = (/[a-z]{2,}/g)
+  while((charsSeqInPaymentRef = charsPattern.exec(paymentRef)) !== null) {
+    if (payableRef.includes(charsSeqInPaymentRef[0])) {
+      console.log("charPaymentRef match: " + charsSeqInPaymentRef[0]);
+      return true;
+    }
+  }
+
+  //look for partial inclusion of payment ref in payable ref
+  if (paymentRef.length >= 2) {
+    for (let i=0; i<=paymentRef.length-2; i++) {
+      console.log(i);
+      let slicedPaymentReference = paymentRef.slice(i, i+paymentRef.length/2)
+      console.log("checking sliced match: " + slicedPaymentReference);
+      if (payableRef.includes(slicedPaymentReference)) {
+        console.log("slice match found: "+ slicedPaymentReference);
+        return true;
+      }
+    }
+    console.log("no match in reference");
+  }
 }
 
 app.listen(3000, () => console.log('try me out on port 3000'));
